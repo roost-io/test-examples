@@ -1,0 +1,32 @@
+SSO login with MFA and lockout handling with masked errors
+Audit trail for login, MFA and lockout
+Customer identification with OTP and anti-enumeration UX
+Anti-enumeration and rate limiting on identification API
+Enforce live vs delayed market data across widgets and order depth
+Direct REST call to foreign live depth should be blocked
+Block self-crossing orders at BP level per TASE rule
+Audit decision logged for self-transaction checks
+Equity buy exceeds maker limit -> assign to specific checker and approve
+Ingest 1051 and 1052 to reconcile and settle authorized order
+ETF order path chooser enforces entitlements and fees
+MF redeem order then UI shows reversal/reallocation in order trail
+Process MF price correction via 1051/1052
+Outside Bank transfer blocks ex-date and enqueues for authorization
+File 15 enqueue and 1051/1052 settlement for outside bank transfer
+Virtual Sell within bank auto-sets target=source and settles EOD
+Tax engine update for virtual sell
+Verify PII masking in UI and exported reports
+Audit/log records are pseudonymous with no raw PII
+Idle timeout and step-up re-auth before Release of sensitive transfer
+Prevent maker from assigning approval to self and allow pool pick
+Direct API attempt by maker to approve is forbidden
+EOD broker file re-captures average price and applies SEC/TAF fees
+Trade Book shows single average price entry after recapture
+Ingest file 32 and 1091, run reconciliation and generate report
+Tax Simulation -> Sell flow with masked identifiers
+Settlement triggers tax posting via tax engine integration
+E-Journal shows Initiated/Authorized by me and denies cross-user access
+Journal entries are immutable and DELETE/PUT is forbidden
+Upload security rates for prior day
+Transfer valuation shows previous close per position and consolidated in account currency
+Third-party delivery out/in remains off TASE interfaces and is reported
