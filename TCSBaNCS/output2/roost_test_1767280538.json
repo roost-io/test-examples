@@ -1,0 +1,432 @@
+[
+    {
+        "type": "non-functional",
+        "title": "E2E Data Flow Map and Terminology Mapping",
+        "description": "Concise mapping of key journeys across Call Center (Front Office) and BaNCS Core (Back Office) plus terminology mapping used in all tests.",
+        "testId": "TC-000",
+        "testDescription": "E2E Data Flow Map (from docs only)\n1) Agent login / SSO / MFA/lockout (ASSUMPTION for MFA/lockout): Input in Call Center: username/password -> Request to Backend: SSO assertion to IdP -> Backend validations: credential check, role/branch (MU) association; lockout threshold (ASSUMPTION) -> Backend state change: session token created, last-login updated -> Response to Call Center: success/failure and role menu (Trading/Banking/Advisory) [Doc A §2.1, Fig 1,4].\n2) Customer identification: Input: Service Mode + Identification Type/Number or Portfolio Reference -> Request to Backend: customer lookup -> Backend validations: exact match; return Portfolio List -> Backend state change: none -> Response: masked customer details + list of portfolios; user selects one -> What to verify: UI list, backend access log entry [Doc A §2.1–2.3, Fig 2–3].\n3) Security Transfer (Within bank): Input: Select positions (Add Security), Add Beneficiary (within bank), Preview, Release -> Request: create transfer order -> Backend validations: MU check, CA ex-date block, same-entity auto-detect via BP ID, fraction qty allowed -> Backend state change: custody block, order=Released then Authorized via maker-checker -> Response: confirmation; Authorization Queue updates -> Verify: UI status, BO order, custody block, E-Journal [Doc A §12.1–12.5; Doc B §4, §4.1.1].\n4) Security Transfer (Outside bank/TASE): Input: Select TASE positions, Outside Bank details, case, Preview, Release -> Request: create transfer order -> Backend validations: Outside bank only for TASE; MF restrictions; ‘Transfer without Identification’ HO-only; value in ILS -> State: custody block; order Authorized; EOD->BOD batch sends File 15; reconcile 1051/1052 -> Response: status transitions -> Verify: order list reconciliation markers [Doc A §12.2 validations; Doc B §4.1.2, Incoming 132/Outgoing 15, recon].\n5) Order placement (Equity/ETF/MF): Input: Create->Preview->Confirm -> Request: order request -> Backend validations: buying power/security balance, product subscription, blocks (POA), order limits; pre-order checks return Error/Warning/Info -> State: Authorized -> Placed with Market -> executions -> Response: order/trade books; trails -> Verify: immutable order trail, statuses, fees [Doc A §3.x, §16, Fig 9–15, 23–28; Doc B §2–3].\n6) Authorization (generic maker-checker): Input: action requiring approval -> Request: create exception -> Backend validations: limits -> State: Authorization Queue (My Queue/Pool Queue), actions by authorizers (#1/#2) -> Response: popup and queue updates -> Verify: E-Journal (Initiated By Me/Authorized By Me) [Doc A §13, Fig 76–79].\n7) Tax Simulation: Input: select securities and simulate -> Request: send to BO which calls MATRIX -> Backend validations: delayed market data; compute tax -> State: none (simulation) -> Response: Tax to Pay/Refund per security -> Verify: delayed flag; results; optional Sell action [Doc A §4.2, Fig 33–34].\n8) Market data entitlements: Inputs: quotes/depth/portfolio valuation/index inquiry -> Backend rules: Table 3 (Always Live vs Based on privilege vs Always Delayed) -> Response: live/delayed data banners -> Verify: entitlement enforcement and delay message [Doc A Table 3; §6].\n9) In-job views and HO visibility: Inputs: In-job Order/Trade/MF/Holding reports -> Backend rules: HO can view ALL call centres; branch limited -> Response: scoped data -> Verify: RBAC and masking [Doc A §8.x].\n10) Corporate actions & ex-date: Input: attempt transfer on CA ex-date -> Backend rule: hard block -> Response: error message -> Verify: no order created [Doc A §12.1 validations; Doc B §4].\nTerminology Mapping (from docs; ASSUMPTION only where marked):\n- Portfolio Reference (Call Center) = Portfolio Ref/Account Number (Backend) [Doc A Fig 3; Doc B flows]\n- Internal Order Number (Call Center) = Order ID (Backend) [Doc A Fig 15, 23, 27]\n- BP ID (Backend party identifier) used for same-entity checks [Doc A §12.2 validations]\n- Transfer Case/Subcase (Call Center) = Same entity tax identifier derivation (Backend: 1/2) [Doc A §12.2; Doc B Securities Transfers table]\n- Security Transfer Status (Call Center: Released/Authorized/Settled) = BO Order/Open Delivery/Settlement Advice matched/settled [Doc A §12.5; Doc B §4.1, recon]\n- Reconciliation statuses: Reconciled/Not Matched/Failed/Pending = TASE files 1051/1052/1054 outcomes [Doc B §3.1]\n- File 15 (Outgoing) = Outside bank transfer instruction generated at BOD (Backend) [Doc B §4.1.2]\n- File 132 (Incoming) = Delivery In instruction to create/repair orders [Doc B §4.1.2]\n- Order Quote/Depth (Call Center) = MI live/delayed feed (Backend MI) [Doc A Table 3]\nNotes: Sensitive profile change; card block/unblock; case/dispute; call recording are NOT IN DOCS and treated as ASSUMPTION/out of scope for functional validation here.",
+        "prerequisites": "Environments: Call Center UI and BaNCS Core connected; MI feeds; ST-SP; MATRIX; TASE test files (1051/1052/1054/15/132) available in test; at least one HO user, branch agent, supervisor; seeded portfolios with holdings and cash.",
+        "stepsToPerform": "1. Read the above data flow and field mapping before executing functional scenarios.\n2. Confirm systems separation: Call Center only initiates and displays; Backend authorizes, executes, persists, reconciles.\n3. For async flows, plan polling windows: 1051/1052/1054 (ASSUMPTION: poll every 60s up to 15m on trade date/settlement); File 15/132 (ASSUMPTION: verify next BOD + T EOD).",
+        "expectedResult": "Test team has a shared reference of end-to-end flows and terminology, aligned strictly to Doc A and Doc B, with explicit ASSUMPTIONS and out-of-scope items noted."
+    },
+    {
+        "type": "functional",
+        "title": "SSO Login Success with Role Landing",
+        "description": "Verify successful login via SSO and correct menu/tiles with integrated login options.",
+        "testId": "TC-001",
+        "testDescription": "Covers SSO login, integrated landing, and Trading tile selection. Ref: Doc A §2.1 (Logging on), Fig 1,4. Security: session issuance in backend and UI role rendering.",
+        "prerequisites": "Valid agent account mapped to a branch MU; SSO IdP test user; browser configured.",
+        "stepsToPerform": "1. [Call Center] Navigate to login URL.\n2. [Call Center] Enter valid username and password; select English.\n3. [Backend] SSO authenticates and validates role/MU.\n4. [Call Center] On success, show Customer Authentication screen (Fig 2) and integrated options (Fig 4).\n5. [Call Center] Select Trading.\n6. [Backend] Create server session; update last-login.\n7. [Call Center] Trading tiles visible (Fig 5), including Authorization Queue, E-Journal.\n8. [Call Center] Verify no PII exposed on the landing page.",
+        "expectedResult": "Login succeeds; correct menu/tiles visible per role; backend session created and role mapped; no sensitive data displayed on landing."
+    },
+    {
+        "type": "functional",
+        "title": "Login Lockout and MFA (Assumption) Handling",
+        "description": "Validate failed attempts cause lockout and MFA step-up flow if enabled (assumption).",
+        "testId": "TC-002",
+        "testDescription": "Ref: Doc A §2.1 for login; MFA/lockout not specified—ASSUMPTION secure defaults. Objective: ensure secure error handling without leaking specifics; session tokens not issued until success.",
+        "prerequisites": "Test agent account with known password; policy for lockout set to 5 attempts (ASSUMPTION).",
+        "stepsToPerform": "1. [Call Center] Attempt login with wrong password 5 times.\n2. [Backend] Reject authentication; increment failure counter; on threshold, set account to locked (ASSUMPTION).\n3. [Call Center] Observe generic error; no hints about which field failed.\n4. [Call Center] Attempt login again with correct password while locked.\n5. [Backend] Deny due to lockout.\n6. [Call Center] If MFA enabled (ASSUMPTION), on a fresh user that is not locked, login with correct password; receive MFA challenge.\n7. [Call Center] Enter correct MFA code.\n8. [Backend] Issue session on MFA success.",
+        "expectedResult": "Account locks after threshold; messages remain generic; no session created before full success; MFA step required and accepted (if enabled)."
+    },
+    {
+        "type": "functional",
+        "title": "Session Timeout, Logout, and Back-button Protection",
+        "description": "Ensure idle timeout ends session and back navigation cannot resurrect it.",
+        "testId": "TC-003",
+        "testDescription": "Ref: Doc A §2.1 for login baseline. Session security is ASSUMPTION; enforce secure defaults.",
+        "prerequisites": "Logged-in agent from TC-001.",
+        "stepsToPerform": "1. [Call Center] Stay idle for configured timeout (ASSUMPTION: 15 minutes).\n2. [Backend] Invalidate session on timeout.\n3. [Call Center] Attempt navigating to Order Entry via bookmark/back.\n4. [Backend] Reject due to expired session.\n5. [Call Center] Click Logout, then press browser back.\n6. [Backend] Ensure no new session is created.\n7. [Call Center] Try to perform any action; redirected to login.",
+        "expectedResult": "Timeout and logout fully invalidate session; back-button shows login; no protected data visible."
+    },
+    {
+        "type": "functional",
+        "title": "Customer Identification – Valid and Masked",
+        "description": "Authenticate customer via Identification Type/Number and select portfolio; ensure masking and audit.",
+        "testId": "TC-004",
+        "testDescription": "Ref: Doc A §2.1–2.3, Fig 2–3. Security: PII masking, access logging, and RBAC.",
+        "prerequisites": "Agent logged in; customer exists with multiple portfolios.",
+        "stepsToPerform": "1. [Call Center] Open Customer Authentication; choose Service Mode=Phone.\n2. [Call Center] Select Identification Type=National ID, enter masked input ******123 (UI may mask while typing—ASSUMPTION).\n3. [Backend] Lookup by ID; return portfolios linked.\n4. [Call Center] Display Portfolio List (Fig 3) with masked Identification Number and customer name.\n5. [Call Center] Select correct portfolio and Submit.\n6. [Backend] Start customer-context session; write access log.",
+        "expectedResult": "Portfolio list appears; PII fields masked (+972*****1234, a***@domain.com if shown); backend logs tie agent, MU, timestamp, portfolio."
+    },
+    {
+        "type": "functional",
+        "title": "Customer Identification – Robust Errors and Anti-Enumeration",
+        "description": "Reject invalid identification values and prevent enumeration through responses.",
+        "testId": "TC-005",
+        "testDescription": "Ref: Doc A §2.1–2.3. Security: generic errors, throttling (ASSUMPTION), no differential responses disclosing existence.",
+        "prerequisites": "Agent logged in.",
+        "stepsToPerform": "1. [Call Center] Enter Identification Type=Passport, Identification Number with invalid format 'ABC!@#'.\n2. [Backend] Validate format; reject.\n3. [Call Center] Repeat with random numbers rapidly for 10 attempts.\n4. [Backend] Apply rate-limit/temporary block (ASSUMPTION).",
+        "expectedResult": "Generic error displayed; no indication whether ID exists; repeated attempts are throttled; audit entry written for failed authentication."
+    },
+    {
+        "type": "functional",
+        "title": "Market Data Entitlements and Delay Messaging",
+        "description": "Verify live vs delayed behavior across functions per subscription matrix.",
+        "testId": "TC-006",
+        "testDescription": "Ref: Doc A Table 3, §6 Market View, §6.4 Get Quote. Validate: Local Order Quote/Depth Always Live; Foreign based on privilege; Gainers/Losers Always Delayed; Tax Simulation Always Delayed; Index Inquiry Always Live.",
+        "prerequisites": "Two customers: one with foreign live privilege, one without; holdings for both local and foreign symbols.",
+        "stepsToPerform": "1. [Call Center] Select customer A (with foreign live). Open Get Quote for TASE symbol; observe live data; Order Depth live.\n2. [Call Center] Open Get Quote for NASDAQ symbol; observe live (since privileged).\n3. [Call Center] Switch to customer B (no foreign live). Open Get Quote for NASDAQ; observe delayed message banner.\n4. [Call Center] Open Top Gainers/Losers; verify delayed banner.\n5. [Call Center] Open Index Watch; ensure Always Live.\n6. [Call Center] Open Tax Simulation; verify Always Delayed notation.\n7. [Backend] MI logs show entitlement checks and response classifications.",
+        "expectedResult": "Entitlements enforced exactly per Table 3 with correct live/delayed banners; backend MI/audit confirms entitlement path."
+    },
+    {
+        "type": "functional",
+        "title": "Equity Order Placement End-to-End (Buy)",
+        "description": "Place a local equity Buy order through Create->Preview->Confirm; verify alerts, fees, trail, and state transitions.",
+        "testId": "TC-007",
+        "testDescription": "Ref: Doc A §3.1–3.2, Fig 9–15, 23, 27–28; Doc B §2–3 validations and lifecycle. Validate pre-trade checks, order statuses, and order trail immutability.",
+        "prerequisites": "Customer context selected; sufficient buying power; live market open.",
+        "stepsToPerform": "1. [Call Center] Open Order Entry; select TASE symbol; fill Quantity, Limit Price, GFD; click Place Order.\n2. [Backend] Run local + BO validations: buying power, product subscription; return Warnings/Infos if any.\n3. [Call Center] Review alerts: Errors block; Warnings require Yes to continue; Infos display.\n4. [Call Center] Preview shows Estimated Commission; click Print commission details; check 'I Agree' and Confirm.\n5. [Backend] Set order Authorized then Placed with Market; write cash block; emit audit.\n6. [Call Center] Confirmation shows Internal Order Number; link to Order Book.\n7. [Backend] On execution, update executed qty, generate movements.\n8. [Call Center] Verify Order Book shows status progressing to Executed; Order Trail lists all events; Trade Book shows trade.",
+        "expectedResult": "Order accepted with correct alert classes; fees shown; statuses advance Authorized->Placed with Market->Executed; immutable trail captured; trade visible; cash block adjusted."
+    },
+    {
+        "type": "functional",
+        "title": "Self-Transaction Prevention at BP level",
+        "description": "Attempt to place an opposite order causing self-transaction block.",
+        "testId": "TC-008",
+        "testDescription": "Ref: Doc A §17.1 TASE Self-Transaction. Same BP, same day, same security when open order exists; block opposite side if price overlaps.",
+        "prerequisites": "Existing open Buy order for BP on symbol S at price P; continuous phase.",
+        "stepsToPerform": "1. [Call Center] With same customer/BP, attempt Sell MKT for symbol S.\n2. [Backend] Detect self-transaction conditions (BP-level); evaluate price overlap per rule.\n3. [Call Center] Receive blocking error 'Self-Transactions are not allowed in TASE'.\n4. [Backend] Ensure no new order created; audit violation.",
+        "expectedResult": "Opposite order is blocked; clear compliant error; no state changes beyond audit."
+    },
+    {
+        "type": "functional",
+        "title": "POA Trading Restriction Handling",
+        "description": "Ensure POA restrictions require additional approval when trading.",
+        "testId": "TC-009",
+        "testDescription": "Ref: Doc B Blocks: POA trading restrictions; FO allowed with approval by another FDB party. Validate maker-checker trigger and E-Journal.",
+        "prerequisites": "Agent is POA on target account; maker limit set to require approval.",
+        "stepsToPerform": "1. [Call Center] Attempt Buy order as POA.\n2. [Backend] Identify POA; trigger approval requirement.\n3. [Call Center] Authorization popup appears (Fig 76); assign to specific authorizer.\n4. [Backend] Create exception; queue to My Queue of authorizer.\n5. [Call Center] Authorizer approves in My Queue.\n6. [Backend] Proceed with order placement; set status Authorized->Placed with Market.\n7. [Call Center] Verify E-Journal shows Initiated By Me/Authorized By Me entries.",
+        "expectedResult": "POA orders require secondary approval; on approval, order proceeds; audit trail in E-Journal complete."
+    },
+    {
+        "type": "functional",
+        "title": "Generic Maker-Checker via Pool Queue (Order over Maker Limit)",
+        "description": "Order exceeding maker’s limit routes to Pool; any authorized user can approve; verify E-Journal.",
+        "testId": "TC-010",
+        "testDescription": "Ref: Doc A §13 Authorization; Fig 76–79. Security: segregation of duties and pool processing.",
+        "prerequisites": "Maker with low limit; at least two authorizers eligible in Pool.",
+        "stepsToPerform": "1. [Call Center] Maker places large order exceeding limit.\n2. [Backend] Raise 'Maker Limit Exceeded' exception; route to Pool Queue.\n3. [Call Center] Authorizer B opens Pool Queue; picks request; approves with remarks.\n4. [Backend] Records authorization; resumes order workflow.\n5. [Call Center] Verify order proceeds; E-Journal tabs show Initiated By Me (maker) and Authorized By Me (authorizer).",
+        "expectedResult": "Pool-based maker-checker works; correct ownership and audit recorded; order only placed after approval."
+    },
+    {
+        "type": "functional",
+        "title": "Order Modification and Cancellation with Immutable Trail",
+        "description": "Modify a pending order; cancel another; verify trails and statuses.",
+        "testId": "TC-011",
+        "testDescription": "Ref: Doc A §3.5.3–3.5.4; Fig 26–27. Ensure all changes appear in the order trail and proper exchange confirmations reflected.",
+        "prerequisites": "Two pending orders for the customer.",
+        "stepsToPerform": "1. [Call Center] From Order Book, select Order A; click Modify; change price; Confirm.\n2. [Backend] Send modification; await exchange confirmation.\n3. [Call Center] Verify status Modified.\n4. [Call Center] Select Order B; Cancel; Confirm.\n5. [Backend] Send cancellation; await confirmation.\n6. [Call Center] Verify status Cancelled.\n7. [Call Center] Open Order Trail for both; ensure full chronology.",
+        "expectedResult": "Order A shows Modified status and delta; Order B Cancelled; trails include timestamps, exchange order/trade numbers where applicable."
+    },
+    {
+        "type": "functional",
+        "title": "Exports Masking and RBAC Scope (Reports and In-job)",
+        "description": "Validate that report exports mask PII and HO can view ALL while branch cannot.",
+        "testId": "TC-012",
+        "testDescription": "Ref: Doc A §8 In-job Activities; §9 Reports; masking requirement inferred—apply secure defaults. Ensure excel exports do not leak full IDs.",
+        "prerequisites": "HO user; branch agent; data present in In-job Order/Trade/MF; report export enabled.",
+        "stepsToPerform": "1. [Call Center - HO] Open In-job Order Book; select ALL call centres; export to Excel.\n2. [Call Center - Branch] Open In-job Order Book; attempt to choose ALL; ensure option disabled.\n3. [Call Center] Export Order History and Trade History for a customer.\n4. [Backend] Generate exports; apply masking (e.g., phone +972*****1234; PAN 4111********1111 if present; no CVV ever).",
+        "expectedResult": "HO sees ALL; branch sees only its center; exports contain masked PII and no sensitive fields; audit of export actions captured."
+    },
+    {
+        "type": "functional",
+        "title": "Security Transfer Within Bank – Same Entity Auto-detect and Multi-beneficiary (Relatives)",
+        "description": "End-to-end within bank transfer including maker-checker and EOD settlement.",
+        "testId": "TC-013",
+        "testDescription": "Ref: Doc A §12.1–12.5 (Add Security/Beneficiary/Preview/Confirm/Authorization); validations 1–28; Doc B §4.1.1. Validate BP auto-matching, fractional quantity, commission preview, and settlement at EOD.",
+        "prerequisites": "Customer with settled positions; two related beneficiary portfolios in same bank; checker #1 and #2 available.",
+        "stepsToPerform": "1. [Call Center] Transfers > Security Transfer; system validates MU; opens Add Security (default TASE selected; settled positions only).\n2. [Call Center] Select multiple positions; enter fractional quantities; Proceed.\n3. [Call Center] Add Beneficiary: choose Within Bank; Transfer Case='Transfer between relatives'; add two beneficiaries with percentages totaling 100%.\n4. [Backend] Auto-determine Same Entity via BP ID for beneficiaries; if same, disable Transfer Case; else require subcase.\n5. [Call Center] Preview: verify commission; print commission; agree and Release.\n6. [Backend] Create order(s); apply custody blocks; status Released; create exception for Authorization.\n7. [Call Center] Maker assigns Checker #1; Checker #1 approves to U-Authorised; if customer exceptions arise, escalates to Checker #2; Checker #2 approves.\n8. [Backend] Mark Authorized; at EOD, mark Settled and move securities between portfolios; update tax engine.",
+        "expectedResult": "Validation passes; multi-beneficiary split applied; maker-checker recorded; order settles by EOD; Security Transfer History shows Released->Authorized->Settled; audit/E-Journal complete."
+    },
+    {
+        "type": "functional",
+        "title": "Security Transfer Within Bank – Different Entity with Tax Identifier Flag",
+        "description": "Within bank transfer to different entity; verify mandatory Transfer Case and correct Same Entity Tax Identifier.",
+        "testId": "TC-014",
+        "testDescription": "Ref: Doc A §12.2 validations (17–21); Doc B Securities Transfers Same Entity Tax Identifier table. Validate correct flag derivation (1/2).",
+        "prerequisites": "Customer and non-related beneficiary portfolio in same bank; checker available.",
+        "stepsToPerform": "1. [Call Center] Add Security; select position.\n2. [Call Center] Add Beneficiary: Within Bank; enter beneficiary account not same BP.\n3. [Backend] Auto uncheck Same Entity; enable Transfer Case dropdown.\n4. [Call Center] Choose Transfer Case='Transfer to children under 18'.\n5. [Call Center] Preview and Release; authorize via maker-checker.\n6. [Backend] Compute Same Entity Tax Identifier=1 per mapping; apply custody blocks; settle at EOD.",
+        "expectedResult": "Transfer Case mandatory and captured; Same Entity Tax Identifier set to 1; order authorized and settled with correct audit markers."
+    },
+    {
+        "type": "functional",
+        "title": "Security Transfer Outside Bank – TASE Only, Files 15/1051/1052 Reconciliation",
+        "description": "Create outside bank transfer to another bank (TASE only); verify batch file generation and reconciliation.",
+        "testId": "TC-015",
+        "testDescription": "Ref: Doc A §12.2 validations (13, 27); §12.3–12.5; Doc B §4.1.2 (Outgoing 15, Incoming 132), recon with 1051/1052.",
+        "prerequisites": "Customer with TASE equity; external bank and branch list present; checker available.",
+        "stepsToPerform": "1. [Call Center] Add Security: select TASE position; Proceed.\n2. [Call Center] Add Beneficiary: choose Outside Bank; select Bank Code and Branch; enter external Account Number; enter Beneficiary holder IDs.\n3. [Backend] Validate: Outside Bank allowed only for TASE; MF restriction enforced; compute order value in ILS.\n4. [Call Center] Preview and Release; authorization by Checker.\n5. [Backend] Create custody block; mark Authorized; do not send immediately.\n6. [Backend] At next BOD, batch generates File 15 (ASSUMPTION: verify file path) and sends.\n7. [Backend] On T trade date, reconcile 1051 (order-level reconciled) and later 1052 for settlement; update status and reconciliation markers.\n8. [Call Center] Security Transfer History shows reconciliation status; poll every 5m up to 30m (ASSUMPTION) to observe updates.",
+        "expectedResult": "Outside Bank transfer accepted; File 15 generated at BOD; reconciliation statuses update via 1051/1052; final status Settled; history shows To Bank/Transfer Amount, Branch Id, User Id."
+    },
+    {
+        "type": "functional",
+        "title": "Corporate Action Ex-date Hard Block on Transfer",
+        "description": "Attempt to transfer security on CA ex-date and ensure it is blocked.",
+        "testId": "TC-016",
+        "testDescription": "Ref: Doc A §12.1 validations (8–9); Doc B §4 Securities Transfers: restricted on ex-date.",
+        "prerequisites": "Security with active CA and ex-date matching business date.",
+        "stepsToPerform": "1. [Call Center] Add Security: select row with CA indicator.\n2. [Call Center] Proceed to Add Beneficiary and attempt Release.\n3. [Backend] Validate ex-date; raise blocking error.\n4. [Call Center] Display: 'Security Transfer is not allowed for this security' message with ex-date.",
+        "expectedResult": "Transfer cannot be created on ex-date; clear blocking message; no order created; audit entry logged."
+    },
+    {
+        "type": "functional",
+        "title": "MU/Home-Branch Restriction for Initiating Security Transfer",
+        "description": "Enforce that agent’s MU must match the customer portfolio MU.",
+        "testId": "TC-017",
+        "testDescription": "Ref: Doc A §12.1 validations (1–2).",
+        "prerequisites": "Agent from MU A; customer portfolio belongs to MU B.",
+        "stepsToPerform": "1. [Call Center] Agent tries Transfers > Security Transfer.\n2. [Backend] Compare MU IDs; mismatch.\n3. [Call Center] Show error 'Kindly visit your home branch to transfer Security'.",
+        "expectedResult": "Transfer function blocked at entry for MU mismatch; no backend order created."
+    },
+    {
+        "type": "functional",
+        "title": "Virtual Sell Capability – Front Office vs Back Office (Conflict Resolution Test)",
+        "description": "Validate behavior for Virtual Sell considering documentation conflict.",
+        "testId": "TC-018",
+        "testDescription": "CONFLICT: Doc A §12.2 shows 'Virtual Sell' checkbox in Call Center Within Bank; Doc B §4.1.1 states Virtual Sell supported only from BO. Test both outcomes. Expected preferred: BO-only restriction; alternative: FO allowed but constrained.",
+        "prerequisites": "Within bank scenario; holdings exist.",
+        "stepsToPerform": "1. [Call Center] Add Beneficiary: Within Bank; try to check Virtual Sell.\n2. [Backend] If BO-only rule enforced: return error or disable control for FO.\n3. [Call Center] If allowed variant: Beneficiary auto-set to source portfolio; Transfer Case disabled; proceed to authorization.\n4. [Backend] Apply movements as within-bank; send to tax engine; settle EOD.",
+        "expectedResult": "Either a) FO UI does not allow Virtual Sell (preferred to align with Doc B), or b) FO allows and processes as per Doc A preview text. Document actual behavior for compliance; log decision."
+    },
+    {
+        "type": "functional",
+        "title": "Incoming Transfer (File 132) – To Be Repaired and Manual Repair",
+        "description": "Process incoming transfers with mismatches leading to 'To Be Repaired' and repair flow.",
+        "testId": "TC-019",
+        "testDescription": "Ref: Doc B §4.1.2 Incoming 132 checks: security present, beneficiary account/ID mismatch, layers vs order qty mismatch.",
+        "prerequisites": "Prepare 132 file with an ID mismatch and a valid record; import window configured.",
+        "stepsToPerform": "1. [Backend] Upload File 132; process.\n2. [Backend] Create Delivery In orders: valid -> Authorized; mismatched -> To Be Repaired.\n3. [Call Center/BO] BO operator opens Incoming Security Transfers report (RSP34101) and repairs details.\n4. [Backend] After repair, mark Authorized; await settlement advice; settle; update history.",
+        "expectedResult": "Valid records auto-authorized; mismatches flagged as To Be Repaired and can be corrected; final settlement updates status and movements."
+    },
+    {
+        "type": "functional",
+        "title": "Tax Simulation – Delayed Data and MATRIX Integration",
+        "description": "Run tax simulation and verify delayed behavior and accurate outputs.",
+        "testId": "TC-020",
+        "testDescription": "Ref: Doc A §4.2, Fig 33–34. Security: delayed feed always; results via MATRIX through BO.",
+        "prerequisites": "Customer with holdings; MI and MATRIX available.",
+        "stepsToPerform": "1. [Call Center] Open Tax Simulation; select a security; edit quantity <= available and price; click Simulate.\n2. [Backend] Send to BO; BO calls MATRIX; compute tax.\n3. [Call Center] Review Tax To Pay/Refund in ILS; option to Sell appears.\n4. [Backend] Ensure no state change beyond simulation; log the request.",
+        "expectedResult": "Module indicates delayed data; tax results computed via BO/MATRIX; no unintended state changes; audit entry for simulation."
+    },
+    {
+        "type": "functional",
+        "title": "Mutual Fund Purchase E2E (Local Market) with Allocation and Settlement",
+        "description": "Place a local MF Purchase order via NAV List and verify allocation (1051) and settlement (T+1/T+1 street per Doc B).",
+        "testId": "TC-021",
+        "testDescription": "Validates MF purchase flow across Create→Preview→Confirm, MF Order Book/Trail, and back-office allocation/settlement timelines including reconciliation.",
+        "prerequisites": "Customer context selected; sufficient cash; local MF available before cut-off; TASE 1051/1052 test harness ready.",
+        "stepsToPerform": "1. [Call Center] Navigate to Orders > Mutual Funds > NAV List and filter by AMC.\n2. [Call Center] Click Purchase for the chosen local fund; verify auto-populated fields (Symbol, Scheme, Latest NAV, Cut off time) per Doc A §3.3.\n3. [Call Center] Enter Units=100 or Amount=1,000 ILS; choose Principal and Fees account; click Place order.\n4. [Call Center] Review alerts; proceed from preview after checking 'I Agree'; click Confirm.\n5. [Backend] Create MF order; apply cash block; mark order 'Transit' and await allocation per Doc B MF flow.\n6. [Backend] At T (evening), process file 1051: allocate at fund level; update executed units if applicable.\n7. [Call Center] Open MF Order Book; verify order status reflects allocation; open MF Order Trail to see timestamps and NAV used.\n8. [Backend] At T+1 17:30, customer-side cash settlement; at T+1 20:30, street (1052) cash and security settlement per Doc B table.\n9. [Call Center] Refresh MF Order Book; verify final status and executed units; export trail (PII masked).",
+        "expectedResult": "MF purchase captured with correct NAV metadata; allocation via 1051 updates trail; cash/security settlements complete per schedule; MF Order Book/Trail reflect final status; exports contain masked PII and show Internal Order Number only.",
+        "testData": "Customer: Portfolio Ref ****7087; Phone +972*****1234; Email a***@domain.com; Fees account: XXXX-ILS; Units=100; Amount=1,000 ILS."
+    },
+    {
+        "type": "functional",
+        "title": "Mutual Fund Redeem E2E (Local) with Cut-off Handling",
+        "description": "Redeem MF units and verify statuses and settlement windows; include cut-off boundary behavior.",
+        "testId": "TC-022",
+        "testDescription": "Covers MF Redeem Create→Preview→Confirm, MF Order Book, allocation (1051), and customer/street settlements per Doc B.",
+        "prerequisites": "Existing MF holdings; cut-off time known; cash and custody systems connected.",
+        "stepsToPerform": "1. [Call Center] Navigate to NAV List and choose Redeem on a held fund (Doc A §3.3 Redeem).\n2. [Call Center] Enter Units=50; verify Full sell unchecked; click Place order.\n3. [Call Center] In Preview, check commission; confirm.\n4. [Backend] Create order; custody block movement; mark 'Transit'.\n5. [Backend] If placed before cut-off: process allocation in file 1051 same day; else push to next cycle (boundary validation).\n6. [Call Center] MF Order Book shows status and executed units once allocated.\n7. [Backend] Perform customer-side cash settlement T+1 17:30 and street settlement 1052 at 20:30 as per Doc B table.\n8. [Call Center] Verify Trade/Order History reflect the transaction and Value Date.\n9. [Call Center] Export MF Order Trail; check masking.",
+        "expectedResult": "Redeem order follows allocation and settlement timeline; statuses and Value Date match Doc B; masking preserved in exports; trail immutable.",
+        "testData": "Portfolio Ref ****7087; Units=50; Phone +972*****1234."
+    },
+    {
+        "type": "functional",
+        "title": "ETF Order Path Selection – Equity Path",
+        "description": "Ensure ETF order prompts for path and processes via Equity route correctly.",
+        "testId": "TC-023",
+        "testDescription": "Validates ETF Order Panel Alert and routing to Equity Order Entry; verifies equity order attributes and execution/trails.",
+        "prerequisites": "ETF instrument available; customer verified; market open.",
+        "stepsToPerform": "1. [Call Center] Open ETF List (Doc A §3.4.1); click Buy on an ETF.\n2. [Call Center] In 'ETF Order Panel Alert' popup (Fig 22), select Equity Order Path and Proceed.\n3. [Call Center] Confirm Equity Order Entry opens with ETF symbol defaulted; set Quantity and Limit price.\n4. [Call Center] Place order -> Preview -> Confirm; print commission.\n5. [Backend] Apply validations; set Authorized → Placed with Market; capture executions.\n6. [Call Center] Review Order Book and Order Trail for ETF equity trade entries.\n7. [Call Center] Export Order History; verify fields per Doc A §9.",
+        "expectedResult": "ETF routed via Equity path, not MF; order executes as equity trade; order/trade books and trail accurate; export contains Internal Order Number and masked customer identifiers.",
+        "testData": "ETF Symbol ABCD; Quantity=100; Price=101.50 ILS; Portfolio Ref ****7087."
+    },
+    {
+        "type": "functional",
+        "title": "ETF Order Path Selection – Mutual Fund Path",
+        "description": "Execute ETF via MF path and validate MF order behavior and commission notes.",
+        "testId": "TC-024",
+        "testDescription": "Checks ETF purchase via Mutual Fund Order Path and MF-specific handling.",
+        "prerequisites": "ETF supports MF path; MF trading parameters configured; customer has funds.",
+        "stepsToPerform": "1. [Call Center] Open ETF List; click Purchase on ETF or click Buy then in popup choose Mutual Fund Order Path.\n2. [Call Center] Confirm MF Purchase screen opens with ETF details; enter Units; Place order.\n3. [Call Center] Review preview, commission details; confirm.\n4. [Backend] Create MF order; handle allocation in 1051 and subsequent settlements per Doc B MF table.\n5. [Call Center] Verify MF Order Book/Trail entries reference ETF via fund path; confirm cut-off and NAV handling present.",
+        "expectedResult": "MF path taken; ETF processed as MF order; allocation and settlement per MF rules; commission comments available (Doc A Fig 68).",
+        "testData": "ETF-Fund Symbol ETF123; Units=75; Fees account ILS."
+    },
+    {
+        "type": "functional",
+        "title": "Order Type Mapping and Stop-Loss/Stop-Limit Field Behavior",
+        "description": "Validate UI-to-backend mapping for order types and field enablement for market vs stop-loss/stop-limit.",
+        "testId": "TC-025",
+        "testDescription": "Covers mapping in Doc A 'Order Type Mapping' for local/foreign, and trigger/limit field rules.",
+        "prerequisites": "Customer context; equity symbol available.",
+        "stepsToPerform": "1. [Call Center] Open Order Entry; choose Local; set Order Type Market; verify Price/Trigger disabled.\n2. [Call Center] Switch to Stoploss; enter Trigger Price < LTP and Limit Price; ensure fields mandatory.\n3. [Call Center] Place both orders (one at Market; one Stoploss) in small quantity.\n4. [Backend] Persist order type codes (e.g., 1=Market, 2=Stoploss, 38=Stoplimit) per Doc A; verify audit/order record fields.\n5. [Call Center] For Stoplimit, ensure both trigger and limit accepted; preview shows correct type.\n6. [Backend] Confirm exchange accepts valid configuration; reject invalid combinations with clear error.",
+        "expectedResult": "Correct enablement/disabling of fields; backend order type codes stored per mapping; invalid combos blocked with errors (Doc A Fig 9).",
+        "testData": "Symbol TASE: ABC; LTP ~ 100 ILS; Market order Qty=10; Stoploss Trigger=95, Limit=94."
+    },
+    {
+        "type": "functional",
+        "title": "Fill or Kill Validity – Immediate Full Execution or Cancel",
+        "description": "Verify FOK orders must fill entirely immediately else cancel.",
+        "testId": "TC-026",
+        "testDescription": "Tests Validity Type 'Fill or Kill' per Doc A; ensures partial execution does not occur.",
+        "prerequisites": "Symbol with insufficient depth at limit price to fill; market open.",
+        "stepsToPerform": "1. [Call Center] Open Order Entry; choose Validity Type=Fill or Kill.\n2. [Call Center] Enter Quantity larger than top-of-book size at Limit=L1 price; Place Order.\n3. [Backend] Route to market; verify exchange returns cancel if full quantity unavailable instantly.\n4. [Call Center] Order Book shows status Cancelled; executed qty=0.\n5. [Call Center] Repeat with smaller quantity equal to visible depth to confirm full execution.",
+        "expectedResult": "FOK behaves as expected: either full immediate execution or Cancelled; no partial fills; trail records exchange response.",
+        "testData": "Symbol XYZ; Qty1=10,000 vs depth=5,000 (cancel); Qty2=5,000 (executed)."
+    },
+    {
+        "type": "functional",
+        "title": "Pre-Order Alerts Classification – Error vs Warning vs Information",
+        "description": "Produce representative validations to ensure correct alert classes and flow control.",
+        "testId": "TC-027",
+        "testDescription": "Uses Doc A §3.1 and Fig 9–10 to confirm UI shows blocking Errors, confirmable Warnings, and informational messages.",
+        "prerequisites": "Customer with buying power slightly insufficient; instrument with minimum qty rule.",
+        "stepsToPerform": "1. [Call Center] Enter Limit Price outside threshold to trigger Error; click Place Order.\n2. [Call Center] Observe red Error dialog; cannot proceed; adjust price.\n3. [Call Center] Enter Quantity below minimum to trigger Warning; proceed by selecting Yes.\n4. [Call Center] Observe Information items (e.g., settlement cycle T+1) shown without blocking.\n5. [Backend] Log validation codes and categories.",
+        "expectedResult": "Errors block submission; Warnings require user consent; Informations display only; backend logs validation categories as per mapping.",
+        "testData": "Price=0.10 ILS when threshold is >=1.00 (example from Fig 9); Qty below minimum."
+    },
+    {
+        "type": "functional",
+        "title": "Failed/Pending Trades Handling via File 1054",
+        "description": "Validate that failed or pending trades update statuses and manual blocks are handled.",
+        "testId": "TC-028",
+        "testDescription": "Simulates failed settlement for a trade; back office updates status based on 1054; manual cash/custody blocks per Doc B.",
+        "prerequisites": "One executed trade susceptible to fail; BO access to inject 1054.",
+        "stepsToPerform": "1. [Backend] Inject 1054 record marking the trade Failed or Pending.\n2. [Backend] Update reconciliation status to Failed/Pending (ST deal + Open Delivery) and instruct manual block creation per Doc B.\n3. [Call Center] Order/Trade Book shows updated status; open Order Trail to see reconciliation status field.\n4. [Backend] After manual remediation and settlement, clear blocks and update final status.",
+        "expectedResult": "1054 updates statuses; manual block entries logged; UI reflects Failed/Pending and eventual resolution.",
+        "testData": "Internal Order Number ****0655; Amount 10,000 ILS."
+    },
+    {
+        "type": "functional",
+        "title": "Security Transfer – Attempt to Transfer MF to Another Entity (Blocked)",
+        "description": "Ensure MF instruments cannot be transferred to other entities per validation rule.",
+        "testId": "TC-029",
+        "testDescription": "Covers Doc A §12.2 validation 22; attempts within bank different-entity MF transfer and expects error.",
+        "prerequisites": "Customer holds MF units; beneficiary account is different entity.",
+        "stepsToPerform": "1. [Call Center] Transfers > Security Transfer > Add Security; select an MF position.\n2. [Call Center] Add Beneficiary: Within Bank; ensure Same Entity unchecked; select any Transfer Case.\n3. [Call Center] Click Verify/Proceed.\n4. [Call Center] Expect error 'Mutual funds cannot be transferred to other entities'.",
+        "expectedResult": "MF transfer to other entities is blocked with explicit error; no order created.",
+        "testData": "MF Symbol 5118625; Units=50; Beneficiary Portfolio ****1104."
+    },
+    {
+        "type": "functional",
+        "title": "Security Transfer – Fractional Quantity and Portfolio Currency Valuation",
+        "description": "Verify fractional transfer quantities and value conversion to portfolio currency with consolidation.",
+        "testId": "TC-030",
+        "testDescription": "Tests Doc A §12.1 allowance for fractional quantities and value calculation; validates order-level value in ILS (Doc B).",
+        "prerequisites": "Holdings in mixed currencies (ILS and USD); exchange rates present.",
+        "stepsToPerform": "1. [Call Center] Add Security: select two positions (one ILS, one USD); default Transfer Quantity equals Available Quantity.\n2. [Call Center] Edit Transfer Quantity to fractional values (e.g., 123.456 and 78.9).\n3. [Call Center] Note Value column per previous close in instrument currency; verify Total Transfer Value header in account currency (Doc A).\n4. [Call Center] Proceed to Preview; print commission.\n5. [Backend] Store order-level value in ILS; compute consolidated value by converting per exchange rate; create blocks.",
+        "expectedResult": "Fractional inputs accepted; individual values shown in trade currency; consolidated and order-level values in ILS; preview/confirmation reflect same.",
+        "testData": "Position1: ILS equity; Qty=123.456; Position2: USD equity; Qty=78.9; ILS/USD=3.50 (example)."
+    },
+    {
+        "type": "functional",
+        "title": "Outside Bank Transfer – 'Transfer without Identification (Tax Event)' RBAC and Flagging",
+        "description": "Branch user blocked from selecting 'Transfer without Identification'; HO user allowed; verify Same Entity Tax Identifier=2.",
+        "testId": "TC-031",
+        "testDescription": "Validates Doc A §12.2 validation 21 and 23 with Doc B mapping for Same Entity Tax Identifier.",
+        "prerequisites": "Both Branch agent and HO user available; TASE instrument selected; external bank/branch list configured.",
+        "stepsToPerform": "1. [Call Center-Branch] Add Beneficiary: Outside Bank; attempt to select Transfer Case='Transfer without Identification (Tax Event)'.\n2. [Call Center-Branch] Verify option not available or selection blocked.\n3. [Call Center-HO] Repeat steps; select 'Transfer without Identification'; enter beneficiary IDs.\n4. [Call Center-HO] Proceed to Preview; view information message about zero-cost basis; confirm and Release.\n5. [Backend] Create order; compute Same Entity Tax Identifier=2; apply custody block; include case type for reporting.",
+        "expectedResult": "Branch cannot select the option; HO can; order created with Same Entity Tax Identifier=2 and info message displayed; audit records show role and case type.",
+        "testData": "External Bank Code 1245; Branch 5124; Beneficiary Account ********5454."
+    },
+    {
+        "type": "functional",
+        "title": "Incoming Transfer (File 132) – Happy Path Authorization and Settlement",
+        "description": "Process a fully valid 132 file record through to settlement and history display.",
+        "testId": "TC-032",
+        "testDescription": "Covers Doc B §4.1.2 successful Delivery In creation (Authorized), settlement advice matching, and Transfer Order history.",
+        "prerequisites": "Prepare 132 with valid security, correct beneficiary identification and layer quantities.",
+        "stepsToPerform": "1. [Backend] Upload 132; pass technical checks; create Delivery In with status Authorized.\n2. [Backend] Generate Open Delivery; await settlement advice and matching; mark Settled.\n3. [Call Center] Open Security Transfer History; filter Incoming; verify status progression and reconciliation markers.\n4. [Call Center] Export history; ensure masking of portfolio/account fields.",
+        "expectedResult": "Valid records become Authorized and settle; history reflects Authorized→Settled; export masked.",
+        "testData": "Beneficiary Portfolio ****7087; Security ABC; Qty=1,000.000."
+    },
+    {
+        "type": "functional",
+        "title": "RBAC – Auditor Read-only Access to In-Job and Reports",
+        "description": "Auditor can view but cannot place/modify orders or initiate transfers; exports allowed within policy.",
+        "testId": "TC-033",
+        "testDescription": "Validates role-based restrictions per Doc A §8 (In-job visibility) and §13 (Authorization) for non-authorizing read-only roles.",
+        "prerequisites": "Auditor role user account; data present in In-job screens and Reports.",
+        "stepsToPerform": "1. [Call Center-Auditor] Login; open In-job Order Book and Trade Book; choose ALL call centres.\n2. [Call Center-Auditor] Attempt to open Order Entry; verify controls disabled.\n3. [Call Center-Auditor] Attempt Transfers > Security Transfer; verify access denied or read-only.\n4. [Call Center-Auditor] Export In-job Order Book; confirm masking and no PII beyond scope.\n5. [Backend] Confirm no authorization queue items can be picked by auditor.",
+        "expectedResult": "Auditor can view ALL in-job data but cannot initiate orders/transfers or authorize; exports masked; no authorization actions possible.",
+        "testData": "Auditor user AUD***01; Email a***@domain.com."
+    },
+    {
+        "type": "functional",
+        "title": "Duplicate Submission Defense – Double-Click Confirm (Order and Transfer)",
+        "description": "Prevent duplicate orders/transfers from rapid re-submission.",
+        "testId": "TC-034",
+        "testDescription": "Ensures idempotency using Internal Order Number and backend deduplication; no duplicate records created.",
+        "prerequisites": "Customer context; network latency simulator to allow rapid re-click.",
+        "stepsToPerform": "1. [Call Center] Prepare an equity order at Preview; double-click Confirm rapidly.\n2. [Backend] Accept first request; reject duplicate by same client/session/nonce; return same Internal Order Number or duplicate warning.\n3. [Call Center] Verify only one order appears in Order Book.\n4. [Call Center] Repeat with Security Transfer Release button; double-click.\n5. [Backend] Ensure a single transfer order is created; additional clicks logged as duplicates.",
+        "expectedResult": "Exactly one order/transfer created; duplicates are rejected with safe messaging; audit logs record duplicate attempts.",
+        "testData": "Symbol ABC; Qty=100; Transfer Qty=12.5; Portfolio ****7087."
+    },
+    {
+        "type": "functional",
+        "title": "Anti-CSRF / Forced-Browse Protection on Authorization Actions (ASSUMPTION)",
+        "description": "Direct URL or forged POST to approve a transaction must be rejected without valid session/CSRF token.",
+        "testId": "TC-035",
+        "testDescription": "Security assumption: sensitive POSTs (approve/reject) require CSRF token and active session; verify rejection when missing/invalid.",
+        "prerequisites": "One pending authorization in Pool Queue; ability to craft HTTP requests to test environment.",
+        "stepsToPerform": "1. [Call Center] Logout from the authorizer account.\n2. [Client] Send a forged POST to Backend approval endpoint with captured parameters but no valid CSRF token (ASSUMPTION endpoint exists).\n3. [Backend] Reject with 401/403; no state change.\n4. [Call Center] Attempt to access Authorization Queue URL directly via bookmark without session; verify redirect to login.",
+        "expectedResult": "No approval possible without active session and CSRF token; no state changes; safe, generic error messages.",
+        "testData": "Transaction Ref ****0123; Authorizer ID SUP***02."
+    },
+    {
+        "type": "functional",
+        "title": "Cash Block Drill Down Accuracy for Buy Trades",
+        "description": "Verify cash block creation at order and release on execution per drill-down report.",
+        "testId": "TC-036",
+        "testDescription": "Links Doc A §5.1.1 Cash Block Drill Down with Doc B local settlement lifecycle for buy orders.",
+        "prerequisites": "Place a Buy order that will execute; fund balance available.",
+        "stepsToPerform": "1. [Call Center] Place a Buy order (small size) and capture Internal Order Number.\n2. [Call Center] Navigate to Accounts & Portfolio > Fund Balance; click Blocked Cash Details.\n3. [Call Center] Verify a block row exists with Transaction Type=Buy, Blocked Reference=Internal Order Number, and Block Release Date pending.\n4. [Backend] On execution, adjust cash block for executed portion; set release date per settlement.\n5. [Call Center] Refresh drill-down; verify updated Block Release Date and amounts.\n6. [Call Center] After settlement, verify block removed and balances updated.",
+        "expectedResult": "Cash block appears at order time, adjusted on execution, and released on settlement; drill-down fields consistent with order/trade.",
+        "testData": "Internal Order Number ****0657; Blocked Amount ~ 1,000.00 ILS."
+    },
+    {
+        "type": "functional",
+        "title": "Foreign MF Price Correction – Reversal and Reallocation (1051)",
+        "description": "Validate automatic reversal and reallocation on T+1 for foreign funds when price corrected.",
+        "testId": "TC-037",
+        "testDescription": "Covers Doc B 'Mutual fund price correction' and foreign MF timeline with allocation reversal and reallocation entries.",
+        "prerequisites": "Executed foreign MF order at T; 1051 corrections available T+1 evening.",
+        "stepsToPerform": "1. [Backend] At T+1 evening, deliver 1051 with reversal and new allocation for the MF.\n2. [Backend] System reverses old allocation and books new at corrected price.\n3. [Call Center] Open MF Order Trail and verify entries for 'Reversal' and 'Reallocate' with corrected NAV.\n4. [Call Center] Check Order/Trade History date and Value Date consistency.",
+        "expectedResult": "Reversal and reallocation processed; MF trail shows both actions with corrected NAV; histories consistent with Doc B schedule.",
+        "testData": "MF Symbol FRMF123; Original NAV 10.00; Corrected NAV 10.10."
+    },
+    {
+        "type": "functional",
+        "title": "Foreign Broker Average Price Recon – Mismatch Reporting",
+        "description": "Ensure broker OrderSummary file drives mismatch report for missing/extra orders.",
+        "testId": "TC-038",
+        "testDescription": "Uses Doc B 'Foreign Trade Settlement Lifecycle' to verify creation of recon report when BaNCS and broker file differ.",
+        "prerequisites": "At least one foreign order executed; prepare broker file with one missing and one extra record.",
+        "stepsToPerform": "1. [Backend] Upload Broker 'OrderSummary' with deliberate mismatches.\n2. [Backend] FO cancels existing trades and captures average price trades; generate mismatch report.\n3. [Call Center/BO] Access recon report; verify flags for 'order missing in BaNCS' and 'order missing in broker file'.\n4. [Backend] After manual correction, mark deals as matched for settlement batch.",
+        "expectedResult": "Recon report lists mismatches; after correction, status updated to matched; settlement can proceed.",
+        "testData": "Order Ref BRK-***-001; Client Ref ****7087; Exec Qty/Price per file."
+    },
+    {
+        "type": "functional",
+        "title": "Third Party Transfer (Foreign Custodian) – Manual Delivery Out/In",
+        "description": "Process third-party transfer not sent to TASE; verify reporting and no File 15 generation.",
+        "testId": "TC-039",
+        "testDescription": "Covers Doc B 'Third Party Transfer' using Delivery Out/In; ensures no TASE interface is invoked.",
+        "prerequisites": "Customer holds foreign asset; BO user role.",
+        "stepsToPerform": "1. [Backend/BO] Create Delivery Out with Transfer Case='Third Party Transfer'; capture details required by external custodian.\n2. [Backend] Verify that no File 15 is produced for this order; store for reporting.\n3. [Backend/BO] Once confirmation received externally, create Delivery In to complete both legs.\n4. [Call Center] Review Security Transfer History for third-party transfer details; export report if available.",
+        "expectedResult": "Third-party transfer processed entirely within BO without TASE files; reporting extract available as per Doc B.",
+        "testData": "Security: US XYZ; Qty=1,000; External custodian ref EXT-TR-***."
+    },
+    {
+        "type": "functional",
+        "title": "Order/Trade History Access Control per Customer Context",
+        "description": "Prevent viewing another customer’s history without proper customer selection.",
+        "testId": "TC-040",
+        "testDescription": "Ensures customer context is required for customer-specific activities per Doc A; denies deep-link attempts.",
+        "prerequisites": "Two customers (A and B) available; agent authenticated.",
+        "stepsToPerform": "1. [Call Center] Authenticate Customer A and open Order History.\n2. [Call Center] Attempt to change URL parameters to access Customer B’s history without re-authentication.\n3. [Backend] Validate customer context; reject or redirect to Customer Authentication.\n4. [Call Center] Properly authenticate Customer B; open Order/Trade History normally.",
+        "expectedResult": "Direct access to another customer’s history is blocked; must perform Customer Authentication to switch context.",
+        "testData": "Customer A Portfolio ****7087; Customer B Portfolio ****1104."
+    }
+]
