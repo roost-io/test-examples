@@ -1,0 +1,24 @@
+{
+  "project": {
+    "name": "TCSBaNCS_functional_smallfile",
+    "created_at": "2026-01-06T04:06:50.612Z",
+    "updated_at": "2026-01-06T04:06:50.612Z"
+  },
+  "files": {
+    "input_files": [
+      {
+        "fileName": "TCSBaNCS_functional_smallfile.txt",
+        "fileURI": "/var/tmp/Roost/RoostGPT/TCSBaNCS_functional_smallfile/aa71e115-e21d-4654-9180-df9f61521dec/functional_tests/TCSBaNCS_functional_smallfile/TCSBaNCS_functional_smallfile.txt",
+        "fileSha": "49ee6c46eb"
+      },
+      {
+        "fileName": "bankspromot.txt",
+        "fileURI": "/var/tmp/Roost/RoostGPT/TCSBaNCS_functional_smallfile/aa71e115-e21d-4654-9180-df9f61521dec/functional_tests/TCSBaNCS_functional_smallfile/bankspromot.txt",
+        "fileSha": "0664b099ba"
+      }
+    ]
+  },
+  "api_files": {
+    "input_files": []
+  }
+}
