@@ -1,0 +1,108 @@
+[
+  {
+    "q": "London",
+    "statusCode": 200,
+    "scenario": "Ok"
+  },
+  {
+    "q": "New York",
+    "dt": "2024-01-15",
+    "statusCode": 200,
+    "scenario": "Ok"
+  },
+  {
+    "q": "Paris",
+    "dt": "2024-02-20",
+    "unixdt": 1708387200,
+    "hour": 12,
+    "lang": "en",
+    "statusCode": 200,
+    "scenario": "Ok"
+  },
+  {
+    "q": "Tokyo",
+    "unixdt": 1708473600,
+    "lang": "ja",
+    "statusCode": 200,
+    "scenario": "Ok"
+  },
+  {
+    "q": "Sydney",
+    "hour": 8,
+    "statusCode": 200,
+    "scenario": "Ok"
+  },
+  {
+    "q": "Berlin",
+    "dt": "2024-03-10",
+    "end": "2024-03-15",
+    "statusCode": 200,
+    "scenario": "Ok"
+  },
+  {
+    "q": "Madrid",
+    "unixdt": 1708560000,
+    "unixend": 1708646400,
+    "lang": "es",
+    "statusCode": 200,
+    "scenario": "Ok"
+  },
+  {
+    "dt": "2024-01-20",
+    "hour": 15,
+    "statusCode": 400,
+    "scenario": "Error code 1003: Parameter 'q' not provided.<br />Error code 1005: API request url is invalid.<br />Error code 1006: No location found matching parameter 'q'<br />Error code 9000: Json body passed in bulk request is invalid. Please make sure it is valid json with utf-8 encoding.<br />Error code 9001: Json body contains too many locations for bulk request. Please keep it below 50 in a single request.<br />Error code 9999: Internal application error."
+  },
+  {
+    "q": "",
+    "dt": "2024-02-10",
+    "statusCode": 400,
+    "scenario": "Error code 1003: Parameter 'q' not provided.<br />Error code 1005: API request url is invalid.<br />Error code 1006: No location found matching parameter 'q'<br />Error code 9000: Json body passed in bulk request is invalid. Please make sure it is valid json with utf-8 encoding.<br />Error code 9001: Json body contains too many locations for bulk request. Please keep it below 50 in a single request.<br />Error code 9999: Internal application error."
+  },
+  {
+    "q": "InvalidCity12345",
+    "dt": "invalid-date",
+    "statusCode": 400,
+    "scenario": "Error code 1003: Parameter 'q' not provided.<br />Error code 1005: API request url is invalid.<br />Error code 1006: No location found matching parameter 'q'<br />Error code 9000: Json body passed in bulk request is invalid. Please make sure it is valid json with utf-8 encoding.<br />Error code 9001: Json body contains too many locations for bulk request. Please keep it below 50 in a single request.<br />Error code 9999: Internal application error."
+  },
+  {
+    "q": "London",
+    "unixdt": -1,
+    "hour": 25,
+    "statusCode": 400,
+    "scenario": "Error code 1003: Parameter 'q' not provided.<br />Error code 1005: API request url is invalid.<br />Error code 1006: No location found matching parameter 'q'<br />Error code 9000: Json body passed in bulk request is invalid. Please make sure it is valid json with utf-8 encoding.<br />Error code 9001: Json body contains too many locations for bulk request. Please keep it below 50 in a single request.<br />Error code 9999: Internal application error."
+  },
+  {
+    "q": "XYZ_NONEXISTENT_PLACE",
+    "dt": "2024-01-01",
+    "statusCode": 400,
+    "scenario": "Error code 1003: Parameter 'q' not provided.<br />Error code 1005: API request url is invalid.<br />Error code 1006: No location found matching parameter 'q'<br />Error code 9000: Json body passed in bulk request is invalid. Please make sure it is valid json with utf-8 encoding.<br />Error code 9001: Json body contains too many locations for bulk request. Please keep it below 50 in a single request.<br />Error code 9999: Internal application error."
+  },
+  {
+    "q": "Rome",
+    "dt": "2024-04-01",
+    "statusCode": 401,
+    "scenario": "Error code 1002: API key not provided.<br />Error code 2006: API key provided is invalid"
+  },
+  {
+    "q": "Barcelona",
+    "unixdt": 1708732800,
+    "lang": "ca",
+    "statusCode": 401,
+    "scenario": "Error code 1002: API key not provided.<br />Error code 2006: API key provided is invalid"
+  },
+  {
+    "q": "Amsterdam",
+    "dt": "2024-05-12",
+    "hour": 14,
+    "statusCode": 403,
+    "scenario": "Error code 2007: API key has exceeded calls per month quota.<br />Error code 2008: API key has been disabled.<br />Error code 2009: API key does not have access to the resource. Please check pricing page for what is allowed in your API subscription plan."
+  },
+  {
+    "q": "Vienna",
+    "unixdt": 1708819200,
+    "lang": "de",
+    "statusCode": 403,
+    "scenario": "Error code 2007: API key has exceeded calls per month quota.<br />Error code 2008: API key has been disabled.<br />Error code 2009: API key does not have access to the resource. Please check pricing page for what is allowed in your API subscription plan."
+  }
+]
