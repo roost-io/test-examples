@@ -1,0 +1,22 @@
+SSO login success renders correct role landing without PII exposure
+Login lockout after failed attempts and MFA step-up on success
+Session timeout and logout prevent back-button access
+Customer identification shows masked fields and portfolio selection
+Invalid identification values return generic errors and throttling
+Market data entitlements show live/delayed banners as per subscription
+Equity Buy order Create -> Preview (alerts) -> Confirm -> Execution trail
+POA trading restriction triggers maker-checker and E-Journal entries
+Orders over maker limit route to Pool Queue and require approval
+Order modification and cancellation are reflected with immutable trails
+Exports masking and RBAC scope for HO/Branch/Auditor roles
+Security Transfer within bank with same-entity auto-detect and multi-beneficiary split
+Transfer entry validation blocks CA ex-date and MU mismatch
+API blocks TASE self-transaction at BP level
+API Outside Bank transfer generates File 15 and reconciles via 1051/1052
+Virtual Sell capability conflict (FO vs BO)
+Anti-CSRF on approval endpoint blocks forged requests
+Duplicate submission defense on Confirm (order and transfer)
+File 1054 updates Failed/Pending trade statuses and manual blocks are handled
+Order type field enablement and FOK behavior
+Tax Simulation always shows delayed data and produces results without state change
+Incoming File 132 creates Delivery In and supports To Be Repaired flow
